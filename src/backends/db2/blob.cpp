@@ -28,6 +28,21 @@ db2_blob_backend::~db2_blob_backend()
     // ...
 }
 
+void db2_blob_backend::assign(details::holder* /*h*/)
+{ 
+    // ...
+}
+
+void db2_blob_backend::read(blob& /*b*/)
+{
+    // ...
+}
+
+void db2_blob_backend::write(blob& /*b*/)
+{
+    // ...
+}
+
 std::size_t db2_blob_backend::get_len()
 {
     // ...

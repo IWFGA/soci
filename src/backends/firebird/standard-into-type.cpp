@@ -113,21 +113,22 @@ void firebird_standard_into_type_backend::exchangeData()
             // cases that require special handling
         case x_blob:
             {
-                blob *tmp = reinterpret_cast<blob*>(data_);
-
-                firebird_blob_backend *blob =
-                    dynamic_cast<firebird_blob_backend*>(tmp->get_backend());
-
-                if (0 == blob)
+                firebird_blob_backend * bbe
+                      = dynamic_cast<firebird_blob_backend *>(statement_.session_.make_blob_backend());
+             
+                if (bbe == NULL)
                 {
                     throw soci_error("Can't get Firebid BLOB BackEnd");
                 }
 
                 GCC_WARNING_SUPPRESS(cast-align)
-
-                blob->assign(*reinterpret_cast<ISC_QUAD*>(buf_));
-
+                bbe->assign(*reinterpret_cast<ISC_QUAD*>(buf_));
                 GCC_WARNING_RESTORE(cast-align)
+
+                blob *b = static_cast<blob*>(data_);
+                bbe->read(*b);
+
+                delete bbe;
             }
             break;
 

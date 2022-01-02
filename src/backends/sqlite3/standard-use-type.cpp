@@ -167,11 +167,18 @@ void sqlite3_standard_use_type_backend::pre_use(indicator const * ind)
         case x_blob:
         {
             col.type_ = dt_blob;
-            blob *b = static_cast<blob *>(data_);
-            sqlite3_blob_backend *bbe = static_cast<sqlite3_blob_backend *>(b->get_backend());
+            sqlite3_blob_backend * bbe
+                    = dynamic_cast<sqlite3_blob_backend *>(statement_.session_.make_blob_backend());
 
-            col.buffer_.constData_ = bbe->get_buffer();
-            col.buffer_.size_ = bbe->get_len();
+            if (bbe == NULL)
+            {
+                throw soci_error("Can't get Postgresql BLOB BackEnd");
+            }
+            blob *b = static_cast<blob *>(data_);
+            bbe->assign(&statement_, pos);
+            bbe->write(*b);
+
+            delete bbe;
             break;
         }
 

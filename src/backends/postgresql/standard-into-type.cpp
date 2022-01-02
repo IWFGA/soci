@@ -123,27 +123,23 @@ void postgresql_standard_into_type_backend::post_fetch(
             break;
         case x_blob:
             {
+                postgresql_blob_backend * bbe
+                      = dynamic_cast<postgresql_blob_backend *>(statement_.session_.make_blob_backend());
+                
+                if (bbe == NULL)
+                 {
+                     throw soci_error("Can't get Postgresql BLOB BackEnd");
+                 }
+
                 unsigned long oid =
                     string_to_unsigned_integer<unsigned long>(buf);
 
-                int fd = lo_open(statement_.session_.conn_, oid,
-                    INV_READ | INV_WRITE);
-                if (fd == -1)
-                {
-                    throw soci_error("Cannot open the blob object.");
-                }
+                bbe->assign(oid);
 
                 blob * b = static_cast<blob *>(data_);
-                postgresql_blob_backend * bbe
-                     = static_cast<postgresql_blob_backend *>(b->get_backend());
+                bbe->read(*b);
 
-                if (bbe->fd_ != -1)
-                {
-                    lo_close(statement_.session_.conn_, bbe->fd_);
-                }
-
-                bbe->fd_ = fd;
-                bbe->oid_ = oid;
+                delete bbe;
             }
             break;
         case x_xmltype:

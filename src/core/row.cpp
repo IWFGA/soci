@@ -7,6 +7,7 @@
 
 #define SOCI_SOURCE
 #include "soci/row.h"
+#include "soci/session.h"
 
 #include <cstddef>
 #include <cctype>
@@ -18,8 +19,13 @@ using namespace details;
 
 row::row()
     : uppercaseColumnNames_(false)
-    , currentPos_(0)
+    , currentPos_(0), session_(NULL)
 {}
+
+row::row(session *s)
+    : uppercaseColumnNames_(false)
+    , currentPos_(0), session_(NULL)
+{ set_session(s); }
 
 row::~row()
 {
@@ -104,8 +110,34 @@ std::size_t row::find_column(std::string const &name) const
     {
         std::ostringstream msg;
         msg << "Column '" << name << "' not found";
+        msg << " in [";
+        for(it = index_.begin(); it != index_.end();it++)
+        {
+            if (it != (index_.begin()))
+                msg << ", ";
+            msg << it->first;
+        }
+        msg << "]";
         throw soci_error(msg.str());
     }
 
     return it->second;
+}
+
+template <>
+blob row::get<blob>(std::size_t pos) const
+{
+    if (session_ == NULL)
+    {
+        throw soci_error("soci::blob objects can be retrieved only by soci::rowset.");
+    }
+
+    blob_backend* bbe = session_->make_blob_backend();
+    bbe->assign(holders_.at(pos));
+
+    blob ret;
+    bbe->read(ret);
+    delete bbe;
+
+    return ret;
 }

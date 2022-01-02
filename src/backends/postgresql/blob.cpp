@@ -24,18 +24,74 @@ using namespace soci::details;
 
 postgresql_blob_backend::postgresql_blob_backend(
     postgresql_session_backend & session)
-    : session_(session), fd_(-1)
-{
-    // nothing to do here, the descriptor is open in the postFetch
-    // method of the Into element
-}
+    : session_(session), oid_(0u), fd_(-1)
+{ }
 
 postgresql_blob_backend::~postgresql_blob_backend()
 {
-    if (fd_ != -1)
+    this->close();
+}
+
+void postgresql_blob_backend::assign(details::holder* h)
+{
+    this->assign(h->get<int>());
+}
+
+void postgresql_blob_backend::assign(unsigned int const & oid)
+{
+    close();
+    oid_ = oid;
+}
+
+void postgresql_blob_backend::read(blob &b)
+{
+    this->open(INV_READ);
+    b.resize(this->get_len());
+    this->read_from_start(&b[0], b.size());
+    this->close();
+}
+
+void postgresql_blob_backend::write(blob &b) 
+{
+    this->open(INV_WRITE);
+    this->write_from_start(&b[0], b.size());
+    this->close();
+}
+
+int postgresql_blob_backend::open(int mode)
+{
+    if (oid_ == 0u)
     {
-        lo_close(session_.conn_, fd_);
+        oid_ = lo_create(session_.conn_, 0);
     }
+
+    fd_ = lo_open(session_.conn_, oid_, mode);
+
+    if (fd_ == -1)
+    {
+        throw soci_error("Cannot open BLOB.");
+    }
+
+    return fd_;
+}
+
+int postgresql_blob_backend::close()
+{
+    if (fd_ == -1)
+    {
+        return 0;
+    }
+
+    int ret = lo_close(session_.conn_, fd_);
+
+    if (ret < 0)
+    {
+        throw soci_error("Cannot close BLOB.");
+    }
+
+    fd_ = -1;
+
+    return ret;
 }
 
 std::size_t postgresql_blob_backend::get_len()
@@ -71,6 +127,11 @@ std::size_t postgresql_blob_backend::read(
 std::size_t postgresql_blob_backend::write(
     std::size_t offset, char const * buf, std::size_t toWrite)
 {
+    if (toWrite == 0)
+    {
+        return static_cast<std::size_t>(toWrite);
+    }
+
     int const pos = lo_lseek(session_.conn_, fd_,
         static_cast<int>(offset), SEEK_SET);
     if (pos == -1)
@@ -80,6 +141,7 @@ std::size_t postgresql_blob_backend::write(
 
     int const writen = lo_write(session_.conn_, fd_,
         const_cast<char *>(buf), toWrite);
+
     if (writen < 0)
     {
         throw soci_error("Cannot write to BLOB.");
@@ -91,6 +153,11 @@ std::size_t postgresql_blob_backend::write(
 std::size_t postgresql_blob_backend::append(
     char const * buf, std::size_t toWrite)
 {
+    if (toWrite == 0)
+    {
+        return static_cast<std::size_t>(toWrite);
+    }
+
     int const pos = lo_lseek(session_.conn_, fd_, 0, SEEK_END);
     if (pos == -1)
     {
